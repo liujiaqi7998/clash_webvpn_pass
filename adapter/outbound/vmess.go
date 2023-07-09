@@ -3,19 +3,22 @@ package outbound
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/Dreamacro/clash/component/dialer"
 	"github.com/Dreamacro/clash/component/resolver"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/transport/gun"
 	"github.com/Dreamacro/clash/transport/socks5"
 	"github.com/Dreamacro/clash/transport/vmess"
+	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"golang.org/x/net/http2"
 )
@@ -50,6 +53,7 @@ type VmessOption struct {
 	HTTP2Opts      HTTP2Options `proxy:"h2-opts,omitempty"`
 	GrpcOpts       GrpcOptions  `proxy:"grpc-opts,omitempty"`
 	WSOpts         WSOptions    `proxy:"ws-opts,omitempty"`
+	WebVpn         bool         `proxy:"WebVpn"`
 }
 
 type HTTPOptions struct {
@@ -74,12 +78,25 @@ type WSOptions struct {
 	EarlyDataHeaderName string            `proxy:"early-data-header-name,omitempty"`
 }
 
+type PersonJson struct {
+	Err     int    `json:"err"`     //错误代码，大于0可行
+	Network string `json:"network"` //webvpn的IP地址
+	Tls     int    `json:"tls"`     //webvpn是否使用ssl
+	Port    int    `json:"port"`    //webvpn端口
+	Host    string `json:"host"`    //webvpn的域名
+	Msg     string `json:"msg"`     //错误信息
+	Path    string `json:"path"`    //转换好的连接信息
+	Cookie  string `json:"cookie"`  //用于过webvpn认证的cookie
+}
+
 // StreamConn implements C.ProxyAdapter
 func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	var err error
+
 	switch v.option.Network {
 	case "ws":
 		host, port, _ := net.SplitHostPort(v.addr)
+
 		wsOpts := &vmess.WebsocketConfig{
 			Host:                host,
 			Port:                port,
@@ -264,6 +281,73 @@ func (v *Vmess) ListenPacketContext(ctx context.Context, metadata *C.Metadata, o
 }
 
 func NewVmess(option VmessOption) (*Vmess, error) {
+
+	if option.WebVpn {
+		var repData = ""
+		if option.Network == "ws" {
+			repData = "net=1" //1为websocket
+		} else if option.Network == "http" {
+			repData = "net=2" //2为http
+		} else {
+			return nil, errors.New("webvpn pass not support Protocol")
+		}
+
+		repData = repData + "&host=" + url.QueryEscape(option.Server)
+		repData = repData + "&port=" + strconv.Itoa(option.Port)
+		repData = repData + "&path=" + url.QueryEscape(option.WSOpts.Path)
+		if option.TLS {
+			repData = repData + "&tls=1"
+		} else {
+			repData = repData + "&tls=0"
+		}
+		baseUrl := "http://127.0.0.1:6795/api/v1/update?" + repData
+		req, err := http.NewRequest("GET", baseUrl, nil)
+		if err != nil {
+			return nil, err
+		}
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Debug("Get json:", string(body))
+
+		var p PersonJson
+		err = json.Unmarshal(body, &p)
+		if err != nil {
+			return nil, err
+		}
+		if p.Err < 0 {
+			return nil, errors.New(p.Msg)
+		}
+
+		option.Server = p.Network
+		option.Port = p.Port
+		if p.Tls == 1 {
+			option.TLS = true
+			option.SkipCertVerify = true
+		} else {
+			option.TLS = false
+		}
+
+		if option.Network == "ws" {
+			option.WSOpts.Headers["Host"] = p.Host
+			option.WSOpts.Path = p.Path
+			option.WSOpts.Headers["Cookie"] = p.Cookie
+		} else if option.Network == "http" {
+			option.HTTPOpts.Headers["Host"][0] = p.Host
+			option.HTTPOpts.Path[0] = p.Path
+			option.HTTPOpts.Headers["Cookie"] = make([]string, 0)
+			option.HTTPOpts.Headers["Cookie"] = append(option.HTTPOpts.Headers["Cookie"], p.Cookie)
+		} else {
+			return nil, errors.New("webvpn pass not support Protocol")
+		}
+	}
+
 	security := strings.ToLower(option.Cipher)
 	client, err := vmess.NewClient(vmess.Config{
 		UUID:     option.UUID,

@@ -186,6 +186,13 @@ func (t *Tunnel) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+type web struct {
+	Enable     bool             `yaml:"enable"`
+	IPv6       bool             `yaml:"ipv6"`
+	NameServer []dns.NameServer `yaml:"nameserver"`
+	Fallback   []dns.NameServer `yaml:"fallback"`
+}
+
 type RawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`

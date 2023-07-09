@@ -30,13 +30,13 @@ var (
 )
 
 func init() {
-	flag.StringVar(&homeDir, "d", "", "set configuration directory")
-	flag.StringVar(&configFile, "f", "", "specify configuration file")
-	flag.StringVar(&externalUI, "ext-ui", "", "override external ui directory")
-	flag.StringVar(&externalController, "ext-ctl", "", "override external controller address")
-	flag.StringVar(&secret, "secret", "", "override secret for RESTful API")
-	flag.BoolVar(&version, "v", false, "show current version of clash")
-	flag.BoolVar(&testConfig, "t", false, "test configuration and exit")
+	flag.StringVar(&homeDir, "d", "E:\\Go\\clash_webvpn_pass\\text_user", "设置配置目录")
+	flag.StringVar(&configFile, "f", "", "指定配置文件")
+	flag.StringVar(&externalUI, "ext-ui", "", "覆盖外部ui目录")
+	flag.StringVar(&externalController, "ext-ctl", "", "覆盖外部控制器地址")
+	flag.StringVar(&secret, "secret", "", "RESTful API的覆盖机密")
+	flag.BoolVar(&version, "v", false, "显示clash的当前版本")
+	flag.BoolVar(&testConfig, "t", false, "测试配置和退出")
 	flag.Parse()
 
 	flagset = map[string]bool{}
