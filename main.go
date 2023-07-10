@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&homeDir, "d", "E:\\Go\\clash_webvpn_pass\\text_user", "设置配置目录")
+	flag.StringVar(&homeDir, "d", "", "设置配置目录")
 	flag.StringVar(&configFile, "f", "", "指定配置文件")
 	flag.StringVar(&externalUI, "ext-ui", "", "覆盖外部ui目录")
 	flag.StringVar(&externalController, "ext-ctl", "", "覆盖外部控制器地址")

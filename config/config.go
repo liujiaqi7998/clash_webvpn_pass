@@ -101,7 +101,7 @@ type Webvpn struct {
 	Tls    bool   `yaml:"Tls"`    // 访问 Webvpn 是否使用TLS加密（https）
 	//AesKey string `yaml:"AesKey"` // 普通链接转换 Webvpn 链接的AesKey，自动获取已经实现
 	//AesIv  string `yaml:"AesIv"`  // 普通链接转换 Webvpn 链接的AesIv，自动获取已经实现
-	Cookie string `yaml:"Cookie"` // 访问 Webvpn 是否使用TLS加密（https）
+	Cookie string `yaml:"Cookie"` // 访问 Webvpn 登录用的Cookie
 }
 
 // Config is clash config manager
