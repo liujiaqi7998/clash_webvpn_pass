@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"github.com/Dreamacro/clash/component/dialer"
 	"github.com/Dreamacro/clash/component/resolver"
+	"github.com/Dreamacro/clash/component/webvpn"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/transport/gun"
 	"github.com/Dreamacro/clash/transport/socks5"
 	"github.com/Dreamacro/clash/transport/vmess"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"strconv"
@@ -72,17 +74,6 @@ type WSOptions struct {
 	Headers             map[string]string `proxy:"headers,omitempty"`
 	MaxEarlyData        int               `proxy:"max-early-data,omitempty"`
 	EarlyDataHeaderName string            `proxy:"early-data-header-name,omitempty"`
-}
-
-type PersonJson struct {
-	Err     int    `json:"err"`     //错误代码，大于0可行
-	Network string `json:"network"` //webvpn的IP地址
-	Tls     int    `json:"tls"`     //webvpn是否使用ssl
-	Port    int    `json:"port"`    //webvpn端口
-	Host    string `json:"host"`    //webvpn的域名
-	Msg     string `json:"msg"`     //错误信息
-	Path    string `json:"path"`    //转换好的连接信息
-	Cookie  string `json:"cookie"`  //用于过webvpn认证的cookie
 }
 
 // StreamConn implements C.ProxyAdapter
@@ -278,71 +269,55 @@ func (v *Vmess) ListenPacketContext(ctx context.Context, metadata *C.Metadata, o
 
 func NewVmess(option VmessOption) (*Vmess, error) {
 
-	if option.WebVpn {
+	if option.WebVpn && webvpn.Cfg.Enable {
 
-		/*var repData = ""
 		if option.Network == "ws" {
-			repData = "net=1" //1为websocket
+			option.WSOpts.Headers["Host"] = webvpn.Cfg.Host
+			var Path = ""
+			if option.TLS {
+				Path = "/wss-"
+			} else {
+				Path = "/ws-"
+			}
+			Path = Path + strconv.Itoa(option.Port) + "/"
+			m, err := webvpn.UrlEncoding(option.Server)
+			if err != nil {
+				return nil, err
+			}
+			Path = Path + m
+			Path = Path + option.WSOpts.Path
+			option.WSOpts.Path = Path
+			option.WSOpts.Headers["Cookie"] = webvpn.Cfg.Cookie
 		} else if option.Network == "http" {
-			repData = "net=2" //2为http
+			option.HTTPOpts.Headers["Host"][0] = webvpn.Cfg.Host
+			var Path = ""
+			if option.TLS {
+				Path = "/https-"
+			} else {
+				Path = "/http-"
+			}
+			Path = Path + strconv.Itoa(option.Port) + "/"
+			m, err := webvpn.UrlEncoding(option.Server)
+			if err != nil {
+				return nil, err
+			}
+			Path = Path + m
+			Path = Path + option.WSOpts.Path
+			option.HTTPOpts.Path[0] = Path
+			option.HTTPOpts.Headers["Cookie"] = make([]string, 0)
+			option.HTTPOpts.Headers["Cookie"] = append(option.HTTPOpts.Headers["Cookie"], webvpn.Cfg.Cookie)
 		} else {
 			return nil, errors.New("webvpn pass not support Protocol")
 		}
-
-		repData = repData + "&host=" + url.QueryEscape(option.Server)
-		repData = repData + "&port=" + strconv.Itoa(option.Port)
-		repData = repData + "&path=" + url.QueryEscape(option.WSOpts.Path)
-		if option.TLS {
-			repData = repData + "&tls=1"
-		} else {
-			repData = repData + "&tls=0"
-		}
-		baseUrl := "http://127.0.0.1:6795/api/v1/update?" + repData
-		req, err := http.NewRequest("GET", baseUrl, nil)
-		if err != nil {
-			return nil, err
-		}
-		response, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		body, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		log.Debug("Get json:", string(body))
-
-		var p PersonJson
-		err = json.Unmarshal(body, &p)
-		if err != nil {
-			return nil, err
-		}
-		if p.Err < 0 {
-			return nil, errors.New(p.Msg)
-		}
-
-		option.Server = p.Network
-		option.Port = p.Port
-		if p.Tls == 1 {
+		option.Server = webvpn.Cfg.Server
+		option.Port = webvpn.Cfg.Port
+		if webvpn.Cfg.Tls {
 			option.TLS = true
 			option.SkipCertVerify = true
 		} else {
 			option.TLS = false
 		}
-
-		if option.Network == "ws" {
-			option.WSOpts.Headers["Host"] = p.Host
-			option.WSOpts.Path = p.Path
-			option.WSOpts.Headers["Cookie"] = p.Cookie
-		} else if option.Network == "http" {
-			option.HTTPOpts.Headers["Host"][0] = p.Host
-			option.HTTPOpts.Path[0] = p.Path
-			option.HTTPOpts.Headers["Cookie"] = make([]string, 0)
-			option.HTTPOpts.Headers["Cookie"] = append(option.HTTPOpts.Headers["Cookie"], p.Cookie)
-		} else {
-			return nil, errors.New("webvpn pass not support Protocol")
-		}*/
+		log.Debug("重装完：", option)
 	}
 
 	security := strings.ToLower(option.Cipher)

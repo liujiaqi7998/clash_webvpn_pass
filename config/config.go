@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/Dreamacro/clash/component/webvpn"
 	"net"
 	"net/url"
 	"os"
@@ -93,14 +94,14 @@ type Experimental struct {
 
 // Webvpn config
 type Webvpn struct {
-	Enable bool   `yaml:"enable"`
-	Server string `yaml:"Server"`
-	Host   string `yaml:"Host"`
-	Port   int    `yaml:"Port"`
-	Tls    bool   `yaml:"Tls"`
-	AesKey string `yaml:"AesKey"`
-	AesIv  string `yaml:"AesIv"`
-	Cookie string `yaml:"Cookie"`
+	Enable bool   `yaml:"enable"` // 使能 Webvpn
+	Server string `yaml:"Server"` // Webvpn 内网服务器地址
+	Host   string `yaml:"Host"`   // Webvpn 外网接收域名
+	Port   int    `yaml:"Port"`   // Webvpn 端口
+	Tls    bool   `yaml:"Tls"`    // 访问 Webvpn 是否使用TLS加密（https）
+	//AesKey string `yaml:"AesKey"` // 普通链接转换 Webvpn 链接的AesKey，自动获取已经实现
+	//AesIv  string `yaml:"AesIv"`  // 普通链接转换 Webvpn 链接的AesIv，自动获取已经实现
+	Cookie string `yaml:"Cookie"` // 访问 Webvpn 是否使用TLS加密（https）
 }
 
 // Config is clash config manager
@@ -296,6 +297,12 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 	}
 	config.General = general
 
+	WebvpnCfg, err := parseWebvpn(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+	config.Webvpn = WebvpnCfg
+
 	proxies, providers, err := parseProxies(rawCfg)
 	if err != nil {
 		return nil, err
@@ -320,12 +327,6 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 		return nil, err
 	}
 	config.DNS = dnsCfg
-
-	WebvpnCfg, err := parseWebvpn(rawCfg)
-	if err != nil {
-		return nil, err
-	}
-	config.Webvpn = WebvpnCfg
 
 	config.Users = parseAuthentication(rawCfg.Authentication)
 
@@ -652,18 +653,15 @@ func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
 
 func parseWebvpn(rawCfg *RawConfig) (*Webvpn, error) {
 	cfg := rawCfg.Webvpn
+	if !cfg.Enable {
+		return nil, nil
+	}
 	if cfg.Enable && len(cfg.Server) == 0 {
 		return nil, fmt.Errorf("if Webvpn configuration is turned on, Server cannot be empty")
 	}
 	if cfg.Enable && cfg.Port == 0 {
 		log.Errorln("webvpn configuration is turned on, but not set Port ,so Port set 443")
 		cfg.Port = 443
-	}
-	if cfg.Enable && len(cfg.AesKey) == 0 {
-		return nil, fmt.Errorf("if Webvpn configuration is turned on, AesKey cannot be empty")
-	}
-	if cfg.Enable && len(cfg.AesIv) == 0 {
-		return nil, fmt.Errorf("if Webvpn configuration is turned on, AesIv cannot be empty")
 	}
 	if cfg.Enable && len(cfg.Cookie) == 0 {
 		return nil, fmt.Errorf("if Webvpn configuration is turned on, Cookie cannot be empty")
@@ -674,9 +672,18 @@ func parseWebvpn(rawCfg *RawConfig) (*Webvpn, error) {
 		Host:   cfg.Host,
 		Port:   cfg.Port,
 		Tls:    cfg.Tls,
-		AesKey: cfg.AesKey,
-		AesIv:  cfg.AesIv,
 		Cookie: cfg.Cookie,
+	}
+
+	webvpn.Cfg.Enable = cfg.Enable
+	webvpn.Cfg.Server = cfg.Server
+	webvpn.Cfg.Host = cfg.Host
+	webvpn.Cfg.Tls = cfg.Tls
+	webvpn.Cfg.Cookie = cfg.Cookie
+	webvpn.Cfg.Port = cfg.Port
+	err := webvpn.LoadWebvpn()
+	if err != nil {
+		return nil, err
 	}
 	return webvpnCfg, nil
 }
