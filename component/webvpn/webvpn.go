@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type Webvpn struct {
@@ -47,21 +48,26 @@ func LoadWebvpn() error {
 	}
 	client := &http.Client{Transport: tr}
 	baseUrl := "https://" + Cfg.Server + "/user/info"
-	req, err := http.NewRequest("GET", baseUrl, nil)
-	req.Header.Set("Host", Cfg.Host)
-	req.Header.Add("Cookie", Cfg.Cookie)
-	if err != nil {
-		return err
-	}
-	response, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	body, err := ioutil.ReadAll(response.Body)
+	err, body := getWebVpnInfo(baseUrl, client)
 	if err != nil {
 		return err
 	}
 
+	// 创建一个定时任务, 每三分钟get一次webvpn
+	ticker := time.NewTicker(3 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// 第二次开始, 每3分钟 get一次
+		err, body := getWebVpnInfo(baseUrl, client)
+		var p PersonJson
+		err = json.Unmarshal(body, &p)
+		if err != nil {
+			log.Error("webvpn返回了非json数据，可能是cookie过期了，请更新！")
+		}
+	}
+
+	// 第一次, 解析json数据
 	var p PersonJson
 	err = json.Unmarshal(body, &p)
 	if err != nil {
@@ -77,6 +83,24 @@ func LoadWebvpn() error {
 	}
 	log.Debug("获取webvpn数据", string(body))
 	return nil
+}
+
+func getWebVpnInfo(baseUrl string, client *http.Client) (error, []byte) {
+	req, err := http.NewRequest("GET", baseUrl, nil)
+	req.Header.Set("Host", Cfg.Host)
+	req.Header.Add("Cookie", Cfg.Cookie)
+	if err != nil {
+		return err, nil
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return err, nil
+	}
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err, nil
+	}
+	return err, body
 }
 
 func UrlEncoding(RawUrl string) (string, error) {
