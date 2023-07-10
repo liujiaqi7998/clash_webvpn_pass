@@ -91,6 +91,18 @@ type Experimental struct {
 	UDPFallbackMatch bool `yaml:"udp-fallback-match"`
 }
 
+// Webvpn config
+type Webvpn struct {
+	Enable bool   `yaml:"enable"`
+	Server string `yaml:"Server"`
+	Host   string `yaml:"Host"`
+	Port   int    `yaml:"Port"`
+	Tls    bool   `yaml:"Tls"`
+	AesKey string `yaml:"AesKey"`
+	AesIv  string `yaml:"AesIv"`
+	Cookie string `yaml:"Cookie"`
+}
+
 // Config is clash config manager
 type Config struct {
 	General      *General
@@ -103,6 +115,7 @@ type Config struct {
 	Proxies      map[string]C.Proxy
 	Providers    map[string]providerTypes.ProxyProvider
 	Tunnels      []Tunnel
+	Webvpn       *Webvpn
 }
 
 type RawDNS struct {
@@ -211,6 +224,7 @@ type RawConfig struct {
 	Interface          string       `yaml:"interface-name"`
 	RoutingMark        int          `yaml:"routing-mark"`
 	Tunnels            []Tunnel     `yaml:"tunnels"`
+	Webvpn             Webvpn       `yaml:"Webvpn"`
 
 	ProxyProvider map[string]map[string]any `yaml:"proxy-providers"`
 	Hosts         map[string]string         `yaml:"hosts"`
@@ -306,6 +320,12 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 		return nil, err
 	}
 	config.DNS = dnsCfg
+
+	WebvpnCfg, err := parseWebvpn(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+	config.Webvpn = WebvpnCfg
 
 	config.Users = parseAuthentication(rawCfg.Authentication)
 
@@ -628,6 +648,37 @@ func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
 	}
 
 	return ipNets, nil
+}
+
+func parseWebvpn(rawCfg *RawConfig) (*Webvpn, error) {
+	cfg := rawCfg.Webvpn
+	if cfg.Enable && len(cfg.Server) == 0 {
+		return nil, fmt.Errorf("if Webvpn configuration is turned on, Server cannot be empty")
+	}
+	if cfg.Enable && cfg.Port == 0 {
+		log.Errorln("webvpn configuration is turned on, but not set Port ,so Port set 443")
+		cfg.Port = 443
+	}
+	if cfg.Enable && len(cfg.AesKey) == 0 {
+		return nil, fmt.Errorf("if Webvpn configuration is turned on, AesKey cannot be empty")
+	}
+	if cfg.Enable && len(cfg.AesIv) == 0 {
+		return nil, fmt.Errorf("if Webvpn configuration is turned on, AesIv cannot be empty")
+	}
+	if cfg.Enable && len(cfg.Cookie) == 0 {
+		return nil, fmt.Errorf("if Webvpn configuration is turned on, Cookie cannot be empty")
+	}
+	webvpnCfg := &Webvpn{
+		Enable: cfg.Enable,
+		Server: cfg.Server,
+		Host:   cfg.Host,
+		Port:   cfg.Port,
+		Tls:    cfg.Tls,
+		AesKey: cfg.AesKey,
+		AesIv:  cfg.AesIv,
+		Cookie: cfg.Cookie,
+	}
+	return webvpnCfg, nil
 }
 
 func parseDNS(rawCfg *RawConfig, hosts *trie.DomainTrie) (*DNS, error) {

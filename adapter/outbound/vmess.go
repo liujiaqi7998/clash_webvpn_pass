@@ -3,7 +3,6 @@ package outbound
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/Dreamacro/clash/component/dialer"
@@ -12,11 +11,8 @@ import (
 	"github.com/Dreamacro/clash/transport/gun"
 	"github.com/Dreamacro/clash/transport/socks5"
 	"github.com/Dreamacro/clash/transport/vmess"
-	log "github.com/sirupsen/logrus"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -283,7 +279,8 @@ func (v *Vmess) ListenPacketContext(ctx context.Context, metadata *C.Metadata, o
 func NewVmess(option VmessOption) (*Vmess, error) {
 
 	if option.WebVpn {
-		var repData = ""
+
+		/*var repData = ""
 		if option.Network == "ws" {
 			repData = "net=1" //1为websocket
 		} else if option.Network == "http" {
@@ -345,7 +342,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 			option.HTTPOpts.Headers["Cookie"] = append(option.HTTPOpts.Headers["Cookie"], p.Cookie)
 		} else {
 			return nil, errors.New("webvpn pass not support Protocol")
-		}
+		}*/
 	}
 
 	security := strings.ToLower(option.Cipher)
