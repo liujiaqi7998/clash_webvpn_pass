@@ -53,19 +53,18 @@ func LoadWebvpn() error {
 		return err
 	}
 
-	// 创建一个定时任务, 每三分钟get一次webvpn
-	ticker := time.NewTicker(3 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		// 第二次开始, 每3分钟 get一次
-		err, body := getWebVpnInfo(baseUrl, client)
-		var p PersonJson
-		err = json.Unmarshal(body, &p)
-		if err != nil {
-			log.Error("webvpn返回了非json数据，可能是cookie过期了，请更新！")
+	go func() {
+		for {
+			time.Sleep(time.Minute * 3)
+			// 第二次开始, 每3分钟 get一次，防止cookie失效
+			err, body := getWebVpnInfo(baseUrl, client)
+			var p PersonJson
+			err = json.Unmarshal(body, &p)
+			if err != nil {
+				log.Error("webvpn返回了非json数据，可能是cookie过期了，请更新！")
+			}
 		}
-	}
+	}()
 
 	// 第一次, 解析json数据
 	var p PersonJson
