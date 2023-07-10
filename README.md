@@ -29,6 +29,10 @@
 
 URL加密参考了 [webvpn-dlut](https://github.com/ESWZY/webvpn-dlut)
 
+通过修改 Host 指向webvpn服务器，并加密原始服务器地址成webvpn的地址赋值给Path实现了穿透。
+
+注意事项：cookie需要手动抓，和ip有关，换IP需要重新抓，仅用来测试协议，不要做违法的事情！
+
 配置方法：
 ```yml
 Webvpn:
